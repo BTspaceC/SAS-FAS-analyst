@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/badge/Version-2.1-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![Models Supported](https://img.shields.io/badge/Models-Gemini%203.1%20Pro%20|%20Claude%204.6%20Sonnet-orange)
+![Models Supported](https://img.shields.io/badge/Models-Gemini%203.1%20Pro%20|%20Claude%204.7%20Opus-orange)
 
 **结构化极度对抗金融分析引擎 (Structured Adversarial Synthesis - Financial Analysis System)**
 
@@ -41,7 +41,7 @@ SAS-FAS 是一款专为专业投资机构和深度研究者设计的多智能体
 
 要发挥本系统的最大威力，生成能够对标顶级机构的尽调档案，强烈建议遵循以下完整的使用流程：
 
-1. **准备顶级模型与环境**：必须使用具备极强逻辑推理能力的模型（如 **Gemini 3.1 Pro** 或 **Claude 4.6 Sonnet**）。将本仓库中的 `SAS-FAS_Instruction.md` 文件内容完整注入，作为模型的 System Prompt 或核心背景指令。
+1. **准备顶级模型与环境**：必须使用具备极强逻辑推理与代码级解析能力的模型（如 **Gemini 3.1 Pro** 或最新于 4 月发布的 **Claude 4.7 Opus**）。将本仓库中的 `SAS-FAS_Instruction.md` 文件内容完整注入，作为模型的 System Prompt 或核心背景指令。
 2. **构建权威、完整的信息源 (Information Gathering)**：
    - **启用联网搜索**：指使 Agent 开启联网功能，直接抓取最新的 10-K/10-Q 财报、SEC 披露文件、电话会议实录或高质量的链上基础数据。
    - **手动补充权威材料**：辅以人为输入的高度可靠数据（如彭博/万得导出的核心报表、特定券商的底层数据）。**强制要求 Agent 必须在输出时保证所有信息来源的完整性与可溯源性**。

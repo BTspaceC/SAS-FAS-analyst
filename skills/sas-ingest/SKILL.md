@@ -1,18 +1,18 @@
 ---
 name: sas-ingest
-description: SAS-FAS v4.0 数据吞吐与沙箱。负责清洗数据、执行Python量化、落盘 JSON 数据库。
+description: SAS-FAS v4.0 数据整理 Skill。负责清洗输入、使用 Python 计算部分指标并写入 JSON。
 ---
 # ROLE: SAS Ingest & Quant Engine
 
 ## 职责
-你是 SAS 的基建部门。绝对禁止在对话中心算复杂公式。一切状态必须写入文件系统。
+你负责整理分析输入。复杂公式使用 Python 脚本计算，中间结果写入工作区文件。
 
 ### Step 1: 序列化与工作区初始化
 如果用户未提供数据，输出标准输入模板索要（利润表、资产负债表、现金流量表等）。
 确定分析标的 Ticker 后，在当前目录下创建文件夹 `sas_workspace_[Ticker]`。
 将用户提供的数据整理为干净的 JSON，使用 `write_to_file` 存入 `sas_workspace_[Ticker]/00_raw_data.json`。
 
-### Step 2: 纯净 Python 沙箱计算
+### Step 2: Python 指标计算
 生成并使用 `run_command` 执行一个 Python 脚本 (`calc.py`)。该脚本必须读取 `00_raw_data.json`，严格按以下公式计算：
 1. **收益质量 (QoE)**：经营现金流 ÷ 净利润
 2. **Sloan 应计利润率**：(净利润 - 自由现金流) ÷ 平均总资产

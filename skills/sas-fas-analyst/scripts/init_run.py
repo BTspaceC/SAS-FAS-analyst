@@ -47,13 +47,29 @@ def main() -> None:
         "status": "collecting_evidence",
         "data_completeness_score": 0,
         "private_data_retained": False,
+        "decision": {
+            "personalized_advice_requested": False,
+            "investor_profile_complete": False,
+        },
         "versions": {"sas_fas": "5.0", "calculator": "5.0"},
     }
     (run_dir / "00_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
     (run_dir / "01_evidence.json").write_text(
-        json.dumps({"critical_fields": [], "metrics": {}, "evidence": [], "conflicts": []}, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        json.dumps(
+            {
+                "critical_fields": [],
+                "metrics": {},
+                "metric_evidence": {},
+                "evidence": [],
+                "conflicts": [],
+            },
+            ensure_ascii=False,
+            indent=2,
+            allow_nan=False,
+        )
+        + "\n",
         encoding="utf-8",
     )
     print(run_dir)

@@ -35,6 +35,8 @@ Use only `high`, `medium`, or `low` for `confidence` so validation and compariso
 
 Treat user material as priority input, not automatic ground truth. If values conflict, retain both, explain timing and definition differences, select a working value only when justified, and test verdict sensitivity to the alternative.
 
+Keep `critical_fields` non-empty once the asset route is defined. In `metric_evidence`, map every critical numeric input to the evidence IDs that support it. Evidence-ready status requires a valid cutoff date, at least one valid evidence item, finite critical values, and complete critical-field mappings. An untouched run scaffold must fail the gate.
+
 ## Claim discipline
 
 - `[F]` must trace to evidence IDs.

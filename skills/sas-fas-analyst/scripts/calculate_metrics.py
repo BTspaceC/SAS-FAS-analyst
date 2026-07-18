@@ -21,10 +21,27 @@ def need(m, *keys):
     return [k for k in keys if m.get(k) is None]
 
 
-def percentage_points(value):
+def alias_percentage_points(value):
     if value is None:
         return None
-    return value * 100 if abs(value) <= 1.5 else value
+    return value * 100 if abs(value) <= 1 else value
+
+
+def bank_percentage_points(metrics, pct_key, alias_key):
+    """`*_pct` inputs are percentage points; legacy aliases may be decimals."""
+    if metrics.get(pct_key) is not None:
+        return metrics[pct_key]
+    return alias_percentage_points(metrics.get(alias_key))
+
+
+def add_null_notes(value, notes, prefix=""):
+    """Ensure every emitted null has a deterministic, addressable explanation."""
+    if isinstance(value, dict):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else key
+            add_null_notes(child, notes, path)
+    elif value is None and prefix not in notes:
+        notes[prefix] = "not calculated: one or more required inputs are missing or inapplicable for this asset route"
 
 
 def equity_metrics(m):
@@ -35,8 +52,8 @@ def equity_metrics(m):
         bvps = m.get("book_value_per_share")
         if bvps is None:
             bvps = div(m.get("book_value_equity"), shares)
-        cet1_pct = percentage_points(m.get("cet1_ratio_pct", m.get("cet1_ratio")))
-        requirement_pct = percentage_points(m.get("binding_cet1_requirement_pct", m.get("binding_cet1_requirement")))
+        cet1_pct = bank_percentage_points(m, "cet1_ratio_pct", "cet1_ratio")
+        requirement_pct = bank_percentage_points(m, "binding_cet1_requirement_pct", "binding_cet1_requirement")
         shortfall = None
         if m.get("htm_book_value") is not None and m.get("htm_fair_value") is not None:
             shortfall = m["htm_book_value"] - m["htm_fair_value"]
@@ -53,6 +70,7 @@ def equity_metrics(m):
             "htm_shortfall_to_tce_pct": None if div(shortfall, m.get("tangible_common_equity")) is None else div(shortfall, m.get("tangible_common_equity")) * 100,
         }
         notes["bank_route"] = "Bank-specific metrics; ordinary industrial QoE, ROIC, Beneish and Altman are intentionally skipped."
+        add_null_notes(out, notes)
         return out, notes
     ni, cfo = m.get("net_income"), m.get("cash_from_operations")
     out["qoe_cfo_to_net_income"] = div(cfo, ni)
@@ -85,7 +103,11 @@ def equity_metrics(m):
     lev_t = div(None if m.get("current_liabilities_current") is None or m.get("long_term_debt_current") is None else m["current_liabilities_current"] + m["long_term_debt_current"], m.get("total_assets_current"))
     lev_p = div(None if m.get("current_liabilities_prior") is None or m.get("long_term_debt_prior") is None else m["current_liabilities_prior"] + m["long_term_debt_prior"], m.get("total_assets_prior"))
     lvgi = div(lev_t, lev_p)
-    tata = div(None if ni is None or cfo is None else ni - cfo, m.get("total_assets_current"))
+    continuing_income = m.get("income_from_continuing_operations")
+    tata = div(
+        None if continuing_income is None or cfo is None else continuing_income - cfo,
+        m.get("total_assets_current"),
+    )
     beneish_parts = {"dsri": dsri, "gmi": gmi, "aqi": aqi, "sgi": sgi, "depi": depi, "sgai": sgai, "lvgi": lvgi, "tata": tata}
     out["beneish_components"] = beneish_parts
     if all(v is not None and math.isfinite(v) for v in beneish_parts.values()):
@@ -93,6 +115,10 @@ def equity_metrics(m):
     else:
         out["beneish_m_score"] = None
         notes["beneish_m_score"] = "requires all eight valid components"
+    if tata is None:
+        notes["beneish_components.tata"] = (
+            "requires income_from_continuing_operations, cash_from_operations, and total_assets_current"
+        )
 
     cls = m.get("company_class")
     x1 = div(m.get("working_capital"), m.get("total_assets_current"))
@@ -117,6 +143,7 @@ def equity_metrics(m):
         out["rule_of_40"] = None
     out["ltv_to_cac"] = div(m.get("ltv"), m.get("cac"))
     out["sbc_to_revenue"] = div(m.get("sbc"), m.get("revenue"))
+    add_null_notes(out, notes)
     return out, notes
 
 
@@ -138,6 +165,7 @@ def crypto_metrics(m):
     for key in ("unlock_pressure_30d", "daily_sell_pressure"):
         if out[key] is None:
             notes[key] = "requires credible spot-volume and sellable-supply inputs"
+    add_null_notes(out, notes)
     return out, notes
 
 

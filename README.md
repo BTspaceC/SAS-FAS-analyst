@@ -59,6 +59,7 @@ The runtime writes an immutable research dossier instead of repeatedly rewriting
 03_bull.md
 04_bear.md
 05_market_structure.md
+06_judge.json
 06_judge.md
 07_FINAL_REPORT.md
 ```
@@ -147,6 +148,12 @@ skills/sas-fas-analyst/
 ```
 
 Historical runs are stored outside the skill by default under `CODEX_HOME/sas-fas-data/runs`. Prior dossiers are never overwritten. Raw private portfolio data is not retained unless the user explicitly requests it.
+
+Run the regression suite before modifying the schemas, formulas or validation gates:
+
+```bash
+python -m unittest discover -s tests -v
+```
 
 ## What SAS‑FAS is not
 

@@ -14,6 +14,8 @@ Before personalized advice, obtain:
 
 If incomplete, provide asset-level research and an illustrative range only. Do not present it as personalized advice.
 
+Record only the gate outcome in `00_manifest.json.decision`: `personalized_advice_requested` and `investor_profile_complete`. Do not store raw private profile fields unless the user explicitly requests retention. Set `06_judge.json.action_mode` to `personalized` only when both flags are true.
+
 ## Four-dimensional verdict
 
 - Evidence grade: A, B, C, D, or F.

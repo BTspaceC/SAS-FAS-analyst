@@ -2,6 +2,25 @@
 
 Use concise Chinese by default. Put the decision before background.
 
+Before writing the narrative, write `06_judge.json` as the machine-checkable decision record:
+
+```json
+{
+  "schema_version": "5.0",
+  "asset_type": "equity",
+  "evidence_grade": "B",
+  "fundamental_state": "stable",
+  "odds_state": "favorable",
+  "verdict_possible": true,
+  "action_mode": "research_only",
+  "scenario_probabilities_pct": {"bear": 25, "base": 50, "bull": 25},
+  "evidence_ids": ["EV-001", "EV-002"],
+  "unresolved_evidence": []
+}
+```
+
+When `verdict_possible` is false, use `odds_state: "undetermined"`, make `unresolved_evidence` non-empty, and omit scenario probabilities if they would imply false precision. `action_mode` is `research_only`, `illustrative`, or `personalized`; the last value requires the mandatory investor-profile gate.
+
 ```markdown
 # [Asset / Ticker] — SAS-FAS v5 深度研究
 > 截止日期 | 资产路由 | 研究期限 | 运行状态

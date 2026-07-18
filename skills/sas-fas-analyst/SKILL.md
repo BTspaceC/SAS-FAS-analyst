@@ -55,8 +55,8 @@ Use the returned directory for the entire analysis. The default root is `CODEX_H
 
 Write:
 
-- `00_manifest.json`: identity, route, question, dates, versions, status, completeness, and privacy flags.
-- `01_evidence.json`: normalized facts plus source, period, retrieval time, confidence, and conflicts.
+- `00_manifest.json`: identity, route, question, dates, versions, status, completeness, privacy flags, and the redacted advice-gate outcome.
+- `01_evidence.json`: normalized facts plus source, period, retrieval time, confidence, conflicts, and critical-metric-to-evidence mappings.
 
 Use user-provided material before searching, then verify it against the source hierarchy. Preserve conflicting values rather than silently selecting one. Do not persist raw private portfolio or account data; retain only the minimum redacted decision inputs unless the user explicitly requests otherwise.
 
@@ -104,7 +104,7 @@ Write `05_market_structure.md`. Explain multi-quarter or multi-year relative str
 
 ### 8. Reconcile evidence and value the asset
 
-The Judge may now read both theses. Write `06_judge.md` containing:
+The Judge may now read both theses. Write a machine-checkable `06_judge.json` and a narrative `06_judge.md` containing:
 
 - the strongest facts surviving adversarial review;
 - disputed claims and which evidence would resolve them;
@@ -122,7 +122,7 @@ If the investor profile is complete, apply `references/portfolio-decision.md`. M
 
 ### 10. Write and validate the final report
 
-Write `07_FINAL_REPORT.md` using `references/report-schema.md`, then run:
+Write `07_FINAL_REPORT.md` using `references/report-schema.md`. The validator checks the quant schema, null reasons, evidence references, required report sections, structured ratings, scenario probabilities, and personalized-advice gate. Then run:
 
 ```text
 python scripts/validate_run.py <run-dir> --stage final
@@ -139,6 +139,7 @@ Report the final verdict and the run directory. If validation fails, fix the run
 03_bull.md
 04_bear.md
 05_market_structure.md
+06_judge.json
 06_judge.md
 07_FINAL_REPORT.md
 ```

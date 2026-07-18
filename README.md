@@ -7,7 +7,6 @@
 [![版本](https://img.shields.io/badge/version-5.0-111827?style=flat-square)](https://github.com/BTspaceC/SAS-FAS-analyst/tree/main)
 [![模型](https://img.shields.io/badge/model-GPT--5.6-10a37f?style=flat-square)](#安装与调用)
 [![覆盖](https://img.shields.io/badge/assets-US%20Equities%20%2B%20Crypto-334155?style=flat-square)](#研究边界)
-[![测试](https://img.shields.io/badge/tests-10%2F10-16a34a?style=flat-square)](#验证与质量控制)
 [![许可](https://img.shields.io/badge/license-MIT-e5e7eb?style=flat-square)](LICENSE)
 
 **真相先于立场 · 证据先于确信 · 生存先于仓位**
@@ -158,23 +157,6 @@ skills/sas-fas-analyst/
 ```
 
 历史研究默认保存在 `CODEX_HOME/sas-fas-data/runs`，不会覆盖旧档案。原始账户信息、钱包地址、完整持仓和精确成本不会默认写入历史记录。
-
-## 验证与质量控制
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-当前回归测试覆盖：
-
-- 空证据脚手架必须被拒绝；
-- 合法 blocker 能正确停止研究；
-- 关键指标必须是有限数值并映射到已知证据；
-- 占位报告、空 Quant、无效日期与错误情景概率必须被拒绝；
-- 所有 `null` 指标必须附带明确原因；
-- 个性化行动必须通过投资者画像门槛；
-- CET1 百分点与小数别名换算；
-- Beneish TATA 的持续经营利润口径。
 
 ## 版本分支
 

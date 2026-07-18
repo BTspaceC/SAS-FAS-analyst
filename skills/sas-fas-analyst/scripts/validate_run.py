@@ -16,6 +16,19 @@ EVIDENCE_READY_STATUSES = {
     "complete",
     "blocked",
 }
+STRICT_TRUTH_DISCIPLINE = 1
+SCENARIO_WEIGHT_BASES = {"empirical", "model_based", "market_implied", "mixed", "judgmental"}
+RECOMMENDED_ACTIONS = {
+    "aggressive_accumulate",
+    "staged_accumulate",
+    "watch",
+    "hold",
+    "reduce",
+    "exit",
+    "avoid",
+}
+NEGATIVE_CLAIM_TYPES = {"evidence_of_impairment", "insufficient_evidence_for_positive_claim"}
+TRIGGER_TYPES = {"asset_valuation", "fundamental", "portfolio_risk", "market_structure", "macro", "time_based"}
 FINAL_SECTIONS = (
     ("verdict", ("## 一句话裁决", "## One-line verdict")),
     ("ratings", ("## 四维评级", "## Four-dimensional rating")),
@@ -23,13 +36,17 @@ FINAL_SECTIONS = (
     ("unknowns", ("## 核心推断与未知", "## Inferences and unknowns")),
     ("bull", ("## Bull",)),
     ("bear", ("## Bear",)),
-    ("valuation", ("## 估值与概率", "## Valuation and probabilities")),
+    ("valuation", ("## 估值与概率", "## Valuation and probabilities", "## 估值、情景权重与稳健性", "## Valuation, scenario weights and robustness")),
     ("market", ("## 基准率与市场结构", "## Base rates and market structure")),
     ("premortem", ("## 事前验尸", "## Pre-mortem")),
     ("action", ("## 行动与仓位", "## Action and position")),
     ("change", ("## 什么会改变结论", "## What would change the conclusion")),
     ("blind_spots", ("## 数据盲区与冲突", "## Data gaps and conflicts")),
     ("sources", ("## 来源", "## Sources")),
+)
+STRICT_FINAL_SECTIONS = (
+    ("policy_forecast_boundary", ("## 投资政策与预测边界", "## Policy and forecast boundary")),
+    ("scenario_robustness", ("## 估值、情景权重与稳健性", "## Valuation, scenario weights and robustness")),
 )
 
 
@@ -67,6 +84,15 @@ def get_path(value, dotted_path):
 
 def finite_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def valid_weights(value):
+    return (
+        isinstance(value, dict)
+        and set(value) == {"bear", "base", "bull"}
+        and all(finite_number(weight) and 0 <= weight <= 100 for weight in value.values())
+        and math.isclose(sum(value.values()), 100, abs_tol=0.01)
+    )
 
 
 def valid_iso(value):
@@ -127,7 +153,7 @@ def evidence_references(text):
     return set(re.findall(r"\bEV-[A-Za-z0-9._-]+\b", text))
 
 
-def validate_markdown(path, ids, errors, *, final=False):
+def validate_markdown(path, ids, errors, *, final=False, strict=False):
     text, err = read_text(path)
     if err:
         errors.append(err)
@@ -146,6 +172,10 @@ def validate_markdown(path, ids, errors, *, final=False):
         for label, alternatives in FINAL_SECTIONS:
             if not any(section in text for section in alternatives):
                 errors.append(f"{path.name} missing {label} section")
+        if strict:
+            for label, alternatives in STRICT_FINAL_SECTIONS:
+                if not any(section in text for section in alternatives):
+                    errors.append(f"{path.name} missing strict {label} section")
         if not re.search(r"\[F\]\[EV-[A-Za-z0-9._-]+\]", text):
             errors.append(f"{path.name} must include at least one [F][EV-ID] fact")
         for marker in ("[I]", "[H]", "[U]"):
@@ -185,6 +215,8 @@ def main():
 
     status = manifest.get("status")
     blocked = status == "blocked"
+    versions = manifest.get("versions")
+    strict = isinstance(versions, dict) and versions.get("truth_discipline") == STRICT_TRUTH_DISCIPLINE
     if status not in EVIDENCE_READY_STATUSES:
         errors.append("manifest status is not evidence-ready")
     if not blocked and not valid_iso(manifest.get("as_of")):
@@ -214,6 +246,7 @@ def main():
         errors.append("non-blocked evidence gate requires at least one evidence item")
 
     ids = set()
+    derived_items = []
     for i, item in enumerate(items):
         if not isinstance(item, dict):
             errors.append(f"evidence[{i}] is not an object")
@@ -236,6 +269,27 @@ def main():
             errors.append(f"evidence[{i}] id must match EV-<identifier>")
         if isinstance(item_id, str) and item_id:
             ids.add(item_id)
+        source_url = item.get("source_url")
+        if strict and isinstance(source_url, str) and source_url.startswith("derived:"):
+            derivation = item.get("derivation")
+            if not isinstance(derivation, dict):
+                errors.append(f"evidence[{i}] derived source requires a derivation object")
+            else:
+                formula = derivation.get("formula")
+                input_ids = derivation.get("input_evidence_ids")
+                if not isinstance(formula, str) or not formula.strip():
+                    errors.append(f"evidence[{i}] derivation requires a non-empty formula")
+                if not isinstance(input_ids, list) or not input_ids or any(not isinstance(ref, str) for ref in input_ids):
+                    errors.append(f"evidence[{i}] derivation requires non-empty input_evidence_ids")
+                else:
+                    derived_items.append((i, item_id, input_ids))
+
+    for i, item_id, input_ids in derived_items:
+        unknown = sorted(set(input_ids) - ids)
+        if unknown:
+            errors.append(f"evidence[{i}] derivation maps to unknown evidence IDs: " + ", ".join(unknown))
+        if item_id in input_ids:
+            errors.append(f"evidence[{i}] derivation must not reference itself")
 
     missing_critical = sorted(field for field in set(critical_fields) if not has_path(metrics, field))
     if missing_critical and not blocked:
@@ -338,16 +392,139 @@ def main():
         ):
             errors.append("personalized action requires requested advice and a complete investor profile")
 
-        probabilities = judge.get("scenario_probabilities_pct")
-        if judge.get("verdict_possible") is True:
-            if not isinstance(probabilities, dict) or set(probabilities) != {"bear", "base", "bull"}:
-                errors.append("decidable verdict requires bear/base/bull scenario probabilities")
-            elif not all(finite_number(value) and 0 <= value <= 100 for value in probabilities.values()):
-                errors.append("scenario probabilities must be finite numbers between 0 and 100")
-            elif not math.isclose(sum(probabilities.values()), 100, abs_tol=0.01):
-                errors.append("scenario probabilities must sum to 100")
-        elif not isinstance(judge.get("unresolved_evidence"), list) or not judge.get("unresolved_evidence"):
-            errors.append("indeterminate verdict requires non-empty unresolved_evidence")
+        if strict:
+            if judge.get("policy_forecast_separated") is not True:
+                errors.append("strict judge requires policy_forecast_separated true")
+            recommended_action = judge.get("recommended_action")
+            if recommended_action not in RECOMMENDED_ACTIONS:
+                errors.append("strict judge recommended_action is invalid")
+
+            if judge.get("verdict_possible") is True:
+                weights = judge.get("scenario_weights_pct")
+                if not valid_weights(weights):
+                    errors.append("decidable strict verdict requires bear/base/bull scenario weights totaling 100")
+                if "scenario_probabilities_pct" in judge:
+                    errors.append("strict judge must use scenario_weights_pct instead of scenario_probabilities_pct")
+                weight_basis = judge.get("scenario_weight_basis")
+                if weight_basis not in SCENARIO_WEIGHT_BASES:
+                    errors.append("strict judge scenario_weight_basis is invalid")
+                if judge.get("scenario_weight_confidence") not in ("high", "medium", "low"):
+                    errors.append("strict judge scenario_weight_confidence is invalid")
+                weight_ids = judge.get("scenario_weight_evidence_ids")
+                if not isinstance(weight_ids, list) or any(not isinstance(ref, str) for ref in weight_ids):
+                    errors.append("strict judge scenario_weight_evidence_ids must be a list of strings")
+                    weight_ids = []
+                unknown = sorted(set(weight_ids) - ids)
+                if unknown:
+                    errors.append("strict judge scenario weight basis cites unknown evidence IDs: " + ", ".join(unknown))
+                if weight_basis in {"empirical", "model_based", "market_implied", "mixed"} and not weight_ids:
+                    errors.append("non-judgmental scenario weights require supporting evidence IDs")
+
+                robustness = judge.get("robustness_test")
+                if not isinstance(robustness, dict):
+                    errors.append("strict judge requires a robustness_test object")
+                else:
+                    cases = robustness.get("cases")
+                    actions = []
+                    if not isinstance(cases, list) or len(cases) < 3:
+                        errors.append("robustness_test requires at least three cases")
+                    else:
+                        for i, case in enumerate(cases):
+                            if not isinstance(case, dict):
+                                errors.append(f"robustness_test case[{i}] must be an object")
+                                continue
+                            if not isinstance(case.get("label"), str) or not case.get("label").strip():
+                                errors.append(f"robustness_test case[{i}] requires a label")
+                            if not valid_weights(case.get("weights_pct")):
+                                errors.append(f"robustness_test case[{i}] weights must total 100")
+                            action = case.get("recommended_action")
+                            if action not in RECOMMENDED_ACTIONS:
+                                errors.append(f"robustness_test case[{i}] recommended_action is invalid")
+                            else:
+                                actions.append(action)
+                    invariant = robustness.get("action_invariant")
+                    if not isinstance(invariant, bool):
+                        errors.append("robustness_test action_invariant must be boolean")
+                    elif actions and invariant != (len(set(actions)) == 1):
+                        errors.append("robustness_test action_invariant contradicts case actions")
+                    if not isinstance(robustness.get("conclusion"), str) or not robustness.get("conclusion").strip():
+                        errors.append("robustness_test requires a substantive conclusion")
+            elif not isinstance(judge.get("unresolved_evidence"), list) or not judge.get("unresolved_evidence"):
+                errors.append("indeterminate verdict requires non-empty unresolved_evidence")
+
+            negative_claims = judge.get("negative_claims")
+            if not isinstance(negative_claims, list):
+                errors.append("strict judge negative_claims must be a list")
+                negative_claims = []
+            for i, claim in enumerate(negative_claims):
+                if not isinstance(claim, dict):
+                    errors.append(f"negative_claims[{i}] must be an object")
+                    continue
+                if not isinstance(claim.get("claim"), str) or not claim.get("claim").strip():
+                    errors.append(f"negative_claims[{i}] requires a claim")
+                classification = claim.get("classification")
+                if classification not in NEGATIVE_CLAIM_TYPES:
+                    errors.append(f"negative_claims[{i}] classification is invalid")
+                claim_ids = claim.get("evidence_ids")
+                if not isinstance(claim_ids, list) or not claim_ids or any(not isinstance(ref, str) for ref in claim_ids):
+                    errors.append(f"negative_claims[{i}] requires evidence_ids")
+                    claim_ids = []
+                unknown = sorted(set(claim_ids) - ids)
+                if unknown:
+                    errors.append(f"negative_claims[{i}] cites unknown evidence IDs: " + ", ".join(unknown))
+                if not isinstance(claim.get("decision_effect"), str) or not claim.get("decision_effect").strip():
+                    errors.append(f"negative_claims[{i}] requires decision_effect")
+                if classification == "insufficient_evidence_for_positive_claim" and (
+                    not isinstance(claim.get("expected_observable"), str) or not claim.get("expected_observable").strip()
+                ):
+                    errors.append(f"negative_claims[{i}] insufficient-support claim requires expected_observable")
+
+            triggers = judge.get("action_triggers")
+            if not isinstance(triggers, list):
+                errors.append("strict judge action_triggers must be a list")
+                triggers = []
+            if action_mode == "personalized" and not triggers:
+                errors.append("personalized strict action requires at least one action trigger")
+            for i, trigger in enumerate(triggers):
+                if not isinstance(trigger, dict):
+                    errors.append(f"action_triggers[{i}] must be an object")
+                    continue
+                for key in ("id", "signal_asset", "target_asset", "zone", "tranche", "review_if_untriggered"):
+                    if not isinstance(trigger.get(key), str) or not trigger.get(key).strip():
+                        errors.append(f"action_triggers[{i}] requires {key}")
+                max_weight = trigger.get("max_portfolio_weight_pct")
+                if not finite_number(max_weight) or not 0 <= max_weight <= 100:
+                    errors.append(f"action_triggers[{i}] max_portfolio_weight_pct must be between 0 and 100")
+                trigger_type = trigger.get("signal_type")
+                if trigger_type not in TRIGGER_TYPES:
+                    errors.append(f"action_triggers[{i}] signal_type is invalid")
+                signal_asset = trigger.get("signal_asset")
+                target_asset = trigger.get("target_asset")
+                if (
+                    trigger_type == "asset_valuation"
+                    and isinstance(signal_asset, str)
+                    and isinstance(target_asset, str)
+                    and signal_asset.casefold() != target_asset.casefold()
+                ):
+                    errors.append(f"action_triggers[{i}] asset valuation signal cannot target another asset")
+                for key in ("confirmations", "vetoes"):
+                    value = trigger.get(key)
+                    if not isinstance(value, list) or not value or any(not isinstance(entry, str) or not entry.strip() for entry in value):
+                        errors.append(f"action_triggers[{i}] requires non-empty {key}")
+                trigger_ids = trigger.get("evidence_ids")
+                if not isinstance(trigger_ids, list) or not trigger_ids or any(not isinstance(ref, str) for ref in trigger_ids):
+                    errors.append(f"action_triggers[{i}] requires evidence_ids")
+                    trigger_ids = []
+                unknown = sorted(set(trigger_ids) - ids)
+                if unknown:
+                    errors.append(f"action_triggers[{i}] cites unknown evidence IDs: " + ", ".join(unknown))
+        else:
+            probabilities = judge.get("scenario_probabilities_pct")
+            if judge.get("verdict_possible") is True:
+                if not valid_weights(probabilities):
+                    errors.append("decidable verdict requires bear/base/bull scenario probabilities totaling 100")
+            elif not isinstance(judge.get("unresolved_evidence"), list) or not judge.get("unresolved_evidence"):
+                errors.append("indeterminate verdict requires non-empty unresolved_evidence")
 
         judge_ids = judge.get("evidence_ids")
         if not isinstance(judge_ids, list) or not judge_ids:
@@ -361,7 +538,19 @@ def main():
 
         for name in ("03_bull.md", "04_bear.md", "05_market_structure.md", "06_judge.md"):
             validate_markdown(root / name, ids, errors)
-        validate_markdown(root / "07_FINAL_REPORT.md", ids, errors, final=True)
+        final_path = root / "07_FINAL_REPORT.md"
+        validate_markdown(final_path, ids, errors, final=True, strict=strict)
+        final_text, final_error = read_text(final_path)
+        if strict and judge.get("scenario_weight_basis") == "judgmental":
+            if not final_error and not (
+                "主观情景权重" in final_text or "judgmental scenario weights" in final_text.lower()
+            ):
+                errors.append("judgmental scenario weights must be labeled explicitly in 07_FINAL_REPORT.md")
+        if strict and action_mode == "personalized" and not final_error:
+            for trigger in judge.get("action_triggers", []):
+                trigger_id = trigger.get("id") if isinstance(trigger, dict) else None
+                if isinstance(trigger_id, str) and trigger_id and trigger_id not in final_text:
+                    errors.append(f"personalized action trigger {trigger_id} must appear in 07_FINAL_REPORT.md")
 
     if errors:
         print("INVALID")

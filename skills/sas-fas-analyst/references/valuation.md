@@ -18,9 +18,13 @@ Explicitly model dilution, holder capture, governance leakage, substitute tokens
 
 ## Scenario discipline
 
-Build bear, base, and bull scenarios with probabilities totaling 100%. Include a zero or near-zero outcome when economically plausible. State the evidence that would move probability between scenarios.
+Build bear, base, and bull scenarios with weights totaling 100%. Include a zero or near-zero outcome when economically plausible. State the evidence that would move weight between scenarios.
 
-Report ranges, not point precision. Calculate probability-weighted value only when scenario inputs are comparable. Label narrative option value separately.
+Classify the weight basis as `empirical`, `model_based`, `market_implied`, `mixed`, or `judgmental`. Use the word probability only for the first four when the method and supporting evidence are disclosed. Otherwise call the numbers judgmental scenario weights; they structure a decision but do not estimate statistical frequency.
+
+Test at least three plausible weight sets, including a more bearish and a more bullish set. State whether the recommended action is invariant. If the action changes, expose the boundary rather than presenting one preferred set as precise.
+
+Report ranges, not point precision. Calculate probability-weighted value only when scenario inputs are comparable and the weight basis is defensible. Label narrative option value separately.
 
 ## Extreme undervaluation
 

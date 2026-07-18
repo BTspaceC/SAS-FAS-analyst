@@ -38,3 +38,5 @@ For banks use: `share_price`, `tangible_book_value_per_share`, `book_value_per_s
 Use `circulating_supply`, `max_supply`, `annual_new_issuance`, `monthly_newly_liquid_tokens`, `token_price`, `spot_volume_30d`, `expected_daily_sellable_tokens`, `credible_daily_spot_volume`, `period_external_revenue`, `period_token_incentives`, `period_burn_value`, `top10_holder_pct`, and `treasury_token_pct` when available.
 
 Every calculator output includes missing-input and applicability notes. Metrics do not become facts until their inputs trace to evidence IDs.
+
+For every decision-relevant derived metric, create a `derived:` evidence item with a human-readable formula and all input evidence IDs. The formula must expose dates and assumptions when combining observations from different cutoffs. Never present a price-only update of a valuation multiple as an official current multiple.

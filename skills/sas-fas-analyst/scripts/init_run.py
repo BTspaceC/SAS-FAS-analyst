@@ -51,7 +51,7 @@ def main() -> None:
             "personalized_advice_requested": False,
             "investor_profile_complete": False,
         },
-        "versions": {"sas_fas": "5.0", "calculator": "5.0"},
+        "versions": {"sas_fas": "5.0", "calculator": "5.0", "truth_discipline": 1},
     }
     (run_dir / "00_manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8"

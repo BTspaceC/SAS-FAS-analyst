@@ -101,7 +101,35 @@ class SkillScriptsTest(unittest.TestCase):
             "odds_state": "favorable",
             "verdict_possible": True,
             "action_mode": "research_only",
-            "scenario_probabilities_pct": {"bear": 25, "base": 50, "bull": 25},
+            "recommended_action": "watch",
+            "policy_forecast_separated": True,
+            "scenario_weights_pct": {"bear": 25, "base": 50, "bull": 25},
+            "scenario_weight_basis": "judgmental",
+            "scenario_weight_confidence": "low",
+            "scenario_weight_evidence_ids": [],
+            "robustness_test": {
+                "cases": [
+                    {
+                        "label": "bearish",
+                        "weights_pct": {"bear": 40, "base": 50, "bull": 10},
+                        "recommended_action": "watch",
+                    },
+                    {
+                        "label": "central",
+                        "weights_pct": {"bear": 25, "base": 50, "bull": 25},
+                        "recommended_action": "watch",
+                    },
+                    {
+                        "label": "bullish",
+                        "weights_pct": {"bear": 15, "base": 50, "bull": 35},
+                        "recommended_action": "watch",
+                    },
+                ],
+                "action_invariant": True,
+                "conclusion": "The recommended action remains watch across all tested weights.",
+            },
+            "negative_claims": [],
+            "action_triggers": [],
             "evidence_ids": ["EV-001"],
             "unresolved_evidence": [],
         }
@@ -123,12 +151,14 @@ Evidence B; stable; favorable; research only.
 - [F][EV-001] Verified fixture fact.
 ## 核心推断与未知
 - [I] Inference.\n- [H] Falsifiable hypothesis.\n- [U] Decision-relevant unknown.
+## 投资政策与预测边界
+The executable policy is separate from uncertain market forecasts.
 ## Bull：最强成立路径
 [F][EV-001] Evidence-linked upside path.
 ## Bear：永久损失路径
 [F][EV-001] Evidence-linked impairment path.
-## 估值与概率
-Bear 25%; base 50%; bull 25%.
+## 估值、情景权重与稳健性
+These are 主观情景权重, not statistical probabilities. The action remains watch across bearish, central, and bullish weights.
 ## 基准率与市场结构
 [F][EV-001] Reference-class and structure note.
 ## 事前验尸
@@ -158,6 +188,38 @@ EV-001 — user-artifact:test-fixture
         final = self.command(VALIDATE, run, "--stage", "final")
         self.assertEqual(evidence.returncode, 0, evidence.stdout)
         self.assertEqual(final.returncode, 0, final.stdout)
+
+    def test_legacy_v5_run_remains_compatible(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        manifest = self.read_json(run / "00_manifest.json")
+        manifest["versions"].pop("truth_discipline")
+        self.write_json(run / "00_manifest.json", manifest)
+        judge = self.read_json(run / "06_judge.json")
+        weights = judge.pop("scenario_weights_pct")
+        judge["scenario_probabilities_pct"] = weights
+        for key in (
+            "recommended_action",
+            "policy_forecast_separated",
+            "scenario_weight_basis",
+            "scenario_weight_confidence",
+            "scenario_weight_evidence_ids",
+            "robustness_test",
+            "negative_claims",
+            "action_triggers",
+        ):
+            judge.pop(key)
+        self.write_json(run / "06_judge.json", judge)
+        report_path = run / "07_FINAL_REPORT.md"
+        report = report_path.read_text(encoding="utf-8")
+        report = report.replace(
+            "## 投资政策与预测边界\nThe executable policy is separate from uncertain market forecasts.\n",
+            "",
+        )
+        report = report.replace("## 估值、情景权重与稳健性", "## 估值与概率")
+        report_path.write_text(report, encoding="utf-8")
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertEqual(result.returncode, 0, result.stdout)
 
     def test_blocked_run_with_substantive_blocker_passes_stop_gate(self):
         run = self.new_run()
@@ -211,19 +273,179 @@ EV-001 — user-artifact:test-fixture
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("complete investor profile", result.stdout)
 
-    def test_invalid_cutoff_and_probabilities_are_rejected(self):
+    def test_invalid_cutoff_and_scenario_weights_are_rejected(self):
         run = self.new_run()
         self.write_valid_final(run)
         manifest = self.read_json(run / "00_manifest.json")
         manifest["as_of"] = "not-a-date"
         self.write_json(run / "00_manifest.json", manifest)
         judge = self.read_json(run / "06_judge.json")
-        judge["scenario_probabilities_pct"] = {"bear": 25, "base": 50, "bull": 50}
+        judge["scenario_weights_pct"] = {"bear": 25, "base": 50, "bull": 50}
         self.write_json(run / "06_judge.json", judge)
         result = self.command(VALIDATE, run, "--stage", "final")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ISO-8601", result.stdout)
-        self.assertIn("sum to 100", result.stdout)
+        self.assertIn("scenario weights totaling 100", result.stdout)
+
+    def test_strict_judge_requires_weight_basis_and_robustness(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        judge = self.read_json(run / "06_judge.json")
+        judge.pop("scenario_weight_basis")
+        judge.pop("robustness_test")
+        self.write_json(run / "06_judge.json", judge)
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("scenario_weight_basis", result.stdout)
+        self.assertIn("robustness_test", result.stdout)
+
+    def test_derived_evidence_requires_formula_and_inputs(self):
+        run = self.new_run()
+        self.make_evidence_ready(run)
+        ledger = self.read_json(run / "01_evidence.json")
+        ledger["evidence"].append(
+            {
+                "id": "EV-DERIVED",
+                "claim": "A decision-relevant value was derived.",
+                "as_of": "2026-07-18T00:00:00Z",
+                "source_url": "derived:test-value",
+                "source_tier": 3,
+                "confidence": "medium",
+            }
+        )
+        self.write_json(run / "01_evidence.json", ledger)
+        result = self.command(VALIDATE, run, "--stage", "evidence")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires a derivation object", result.stdout)
+
+    def test_derived_evidence_with_formula_and_inputs_passes(self):
+        run = self.new_run()
+        self.make_evidence_ready(run)
+        ledger = self.read_json(run / "01_evidence.json")
+        ledger["evidence"].append(
+            {
+                "id": "EV-DERIVED",
+                "claim": "A decision-relevant value was derived reproducibly.",
+                "as_of": "2026-07-18T00:00:00Z",
+                "source_url": "derived:test-value",
+                "source_tier": 3,
+                "confidence": "medium",
+                "derivation": {
+                    "formula": "observed_price * 2",
+                    "input_evidence_ids": ["EV-001"],
+                },
+            }
+        )
+        self.write_json(run / "01_evidence.json", ledger)
+        result = self.command(VALIDATE, run, "--stage", "evidence")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_cross_asset_valuation_trigger_is_rejected(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        manifest = self.read_json(run / "00_manifest.json")
+        manifest["decision"] = {
+            "personalized_advice_requested": True,
+            "investor_profile_complete": True,
+        }
+        self.write_json(run / "00_manifest.json", manifest)
+        judge = self.read_json(run / "06_judge.json")
+        judge["action_mode"] = "personalized"
+        judge["recommended_action"] = "staged_accumulate"
+        judge["action_triggers"] = [
+            {
+                "id": "TR-001",
+                "signal_asset": "BTC",
+                "target_asset": "ETH",
+                "signal_type": "asset_valuation",
+                "zone": "BTC valuation enters a low zone.",
+                "confirmations": ["BTC demand remains intact."],
+                "vetoes": ["BTC thesis impairment."],
+                "tranche": "Release 25% of reserved capital.",
+                "max_portfolio_weight_pct": 15,
+                "review_if_untriggered": "Review in six months.",
+                "evidence_ids": ["EV-001"],
+            }
+        ]
+        self.write_json(run / "06_judge.json", judge)
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot target another asset", result.stdout)
+
+    def test_same_asset_zone_trigger_passes_personalized_gate(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        manifest = self.read_json(run / "00_manifest.json")
+        manifest["decision"] = {
+            "personalized_advice_requested": True,
+            "investor_profile_complete": True,
+        }
+        self.write_json(run / "00_manifest.json", manifest)
+        judge = self.read_json(run / "06_judge.json")
+        judge["action_mode"] = "personalized"
+        judge["recommended_action"] = "staged_accumulate"
+        judge["action_triggers"] = [
+            {
+                "id": "TR-001",
+                "signal_asset": "BTC",
+                "target_asset": "BTC",
+                "signal_type": "asset_valuation",
+                "zone": "BTC enters a broad low-valuation zone rather than an exact bottom.",
+                "confirmations": ["BTC demand and realized value remain intact."],
+                "vetoes": ["Evidence of permanent BTC thesis impairment."],
+                "tranche": "Release 25% of reserved BTC capital.",
+                "max_portfolio_weight_pct": 15,
+                "review_if_untriggered": "Review in six months and retain the liquidity floor.",
+                "evidence_ids": ["EV-001"],
+            }
+        ]
+        self.write_json(run / "06_judge.json", judge)
+        report_path = run / "07_FINAL_REPORT.md"
+        report = report_path.read_text(encoding="utf-8")
+        report = report.replace(
+            "Research only; no personalized action.",
+            "TR-001 — personalized staged accumulation under the documented zone, confirmations, and vetoes.",
+        )
+        report_path.write_text(report, encoding="utf-8")
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_nonjudgmental_weights_require_supporting_evidence(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        judge = self.read_json(run / "06_judge.json")
+        judge["scenario_weight_basis"] = "empirical"
+        self.write_json(run / "06_judge.json", judge)
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("require supporting evidence IDs", result.stdout)
+
+    def test_judgmental_weights_require_explicit_report_label(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        report = (run / "07_FINAL_REPORT.md").read_text(encoding="utf-8")
+        report = report.replace("主观情景权重", "scenario weights")
+        (run / "07_FINAL_REPORT.md").write_text(report, encoding="utf-8")
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must be labeled explicitly", result.stdout)
+
+    def test_insufficient_support_claim_requires_expected_observable(self):
+        run = self.new_run()
+        self.write_valid_final(run)
+        judge = self.read_json(run / "06_judge.json")
+        judge["negative_claims"] = [
+            {
+                "claim": "The positive value-capture thesis lacks support.",
+                "classification": "insufficient_evidence_for_positive_claim",
+                "evidence_ids": ["EV-001"],
+                "decision_effect": "Do not upgrade the position.",
+            }
+        ]
+        self.write_json(run / "06_judge.json", judge)
+        result = self.command(VALIDATE, run, "--stage", "final")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires expected_observable", result.stdout)
 
     def test_critical_metric_requires_finite_value_and_known_evidence(self):
         run = self.new_run()

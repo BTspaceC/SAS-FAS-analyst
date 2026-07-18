@@ -18,6 +18,10 @@ Seek truth before advocacy. Analyze three to five years as the primary horizon a
 7. Make opinions aggressive only when payoff asymmetry supports them. Reflect permanent-loss and zero-risk in position sizing.
 8. Do not provide personalized trading or position advice until the mandatory investor profile is complete.
 9. Default to Chinese output while retaining useful English metric names. Follow the user's language when they clearly prefer another language.
+10. Separate executable investment policy from uncertain market forecasts. Never borrow the authority of one for the other.
+11. Call scenario numbers probabilities only when an empirical, model-based, or market-implied basis is documented. Otherwise label them judgmental scenario weights and test whether the action survives alternative weights.
+12. Keep action triggers asset-specific. A valuation signal for one asset may not release capital into another asset without independent target-asset evidence.
+13. Distinguish evidence of impairment from insufficient evidence for a positive claim. Unknown is not failed, and missing support is not proof of deterioration.
 
 ## Load only what applies
 
@@ -59,6 +63,8 @@ Write:
 - `01_evidence.json`: normalized facts plus source, period, retrieval time, confidence, conflicts, and critical-metric-to-evidence mappings.
 
 Use user-provided material before searching, then verify it against the source hierarchy. Preserve conflicting values rather than silently selecting one. Do not persist raw private portfolio or account data; retain only the minimum redacted decision inputs unless the user explicitly requests otherwise.
+
+Keep one source per evidence item. When a number is derived, store its formula and input evidence IDs; expose the same derivation in the final report when it can affect the verdict. Record the effective period and last verification date for fees, rates, quotas, incentives, and other time-limited terms.
 
 Checkpoint continuously: append each material source or coherent evidence batch to `01_evidence.json` immediately, update `00_manifest.json.status` after every workflow stage, and tell the user when evidence collection, adversarial analysis, and final reconciliation begin. Do not keep the only copy of gathered evidence in model context.
 
@@ -109,20 +115,26 @@ The Judge may now read both theses. Write a machine-checkable `06_judge.json` an
 - the strongest facts surviving adversarial review;
 - disputed claims and which evidence would resolve them;
 - reference class and base-rate adjustment;
-- bear, base, and bull scenarios with explicit probabilities that sum to 100%;
+- bear, base, and bull scenario weights that sum to 100%;
+- the basis and confidence of empirical probabilities or, when no statistical basis exists, explicit judgmental scenario weights;
+- at least three alternative weight sets and whether the recommended action remains invariant;
 - valuation range and assumptions for each scenario;
 - pre-mortem: trigger → liquidity transmission → operating or protocol damage → permanent impairment;
 - thesis status, evidence grade, odds state, and whether a verdict is possible.
 
 Do not average incompatible methods. Explain which valuation method deserves the most weight and why.
 
+Write negative conclusions as either `evidence_of_impairment` or `insufficient_evidence_for_positive_claim`. Do not convert the second into the first. Keep the investment-policy decision separate from forecast ranges.
+
 ### 9. Issue an action only when requested
 
 If the investor profile is complete, apply `references/portfolio-decision.md`. Make concentration recommendations against the total investment portfolio. Treat shorting as a separate, explicitly requested decision with borrow, instrument, loss-cap, squeeze, and leverage analysis.
 
+For every personalized action, record evidence-linked release conditions, confirmation conditions, veto conditions, and the target asset. Asset-specific valuation signals may act only on the same asset; a cross-asset allocation requires independent evidence for the receiving asset.
+
 ### 10. Write and validate the final report
 
-Write `07_FINAL_REPORT.md` using `references/report-schema.md`. The validator checks the quant schema, null reasons, evidence references, required report sections, structured ratings, scenario probabilities, and personalized-advice gate. Then run:
+Write `07_FINAL_REPORT.md` using `references/report-schema.md`. The validator checks the quant schema, null reasons, evidence references, required report sections, structured ratings, scenario-weight basis and robustness, asset-specific triggers, negative-claim classification, and the personalized-advice gate. Then run:
 
 ```text
 python scripts/validate_run.py <run-dir> --stage final

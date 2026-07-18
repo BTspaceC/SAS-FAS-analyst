@@ -37,6 +37,20 @@ Move crypto one band lower than a comparable equity by default. Build positions 
 
 Recommend exceptional concentration only when every extreme-undervaluation gate in `valuation.md` passes and the investor profile supports it. State what evidence releases each next tranche and what invalidates the thesis.
 
+## Trigger discipline
+
+Use valuation zones plus confirmation and veto conditions, not unsupported decimal thresholds. Every personalized trigger must identify:
+
+- the signal asset and target asset;
+- a valuation or market-structure zone rather than a claimed exact bottom;
+- independent confirmation evidence;
+- fundamental, custody, or liquidity veto conditions;
+- the tranche released and the maximum resulting portfolio weight.
+
+An asset-specific valuation signal may release capital only into the same asset. A BTC valuation metric cannot trigger an ETH purchase, and an equity multiple cannot trigger a crypto purchase, unless the receiving asset independently passes its own evidence gate. Macro or portfolio-risk triggers may affect several assets, but each target still needs a stated rationale.
+
+If a trigger may never occur, state the time-based review or structural liquidity floor. Do not let uncalibrated precision trap capital indefinitely.
+
 ## Risk-seeking posture
 
 Accept high failure probability only for sufficiently convex payoff. Let the thesis be aggressive while sizing for survival. Treat a small position in a credible right-tail option as different from a large position in an unverified story.

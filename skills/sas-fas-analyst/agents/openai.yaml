@@ -1,0 +1,4 @@
+interface:
+  display_name: "SAS-FAS v5"
+  short_description: "美股与加密资产的证据优先深度研究、多空验证和长期投资裁决"
+  default_prompt: "Use $sas-fas-analyst to perform an evidence-first deep investment analysis of this asset."

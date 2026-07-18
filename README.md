@@ -1,99 +1,170 @@
-# SAS-FAS Analyst v4.0
+<div align="center">
 
-SAS-FAS 是一组用于基本面、风险和加密资产分析的 Agent Skill。项目把数据整理、看多分析、风险分析、加密资产分析和结论汇总拆分为独立步骤，并通过工作区文件传递结果。
+# SAS‑FAS Analyst
 
-该项目是 Agent Skill 与提示词工作流，不是独立部署的网络微服务系统。
+### Evidence-first adversarial investment research for US equities and crypto assets
 
-## 项目用途
+[![Version](https://img.shields.io/badge/version-5.0-111827?style=flat-square)](#)
+[![Model](https://img.shields.io/badge/model-GPT--5.6-10a37f?style=flat-square)](#)
+[![Assets](https://img.shields.io/badge/assets-US%20Equities%20%2B%20Crypto-334155?style=flat-square)](#)
+[![License](https://img.shields.io/badge/license-MIT-e5e7eb?style=flat-square)](LICENSE)
 
-- 整理用户提供的财报、业务数据和公开资料。
-- 使用固定分析框架分别形成看多与风险观点。
-- 对部分量化指标调用 Python 脚本计算并保存结果。
-- 汇总各步骤输出，形成包含依据、反例和限制的结构化分析报告。
+**Truth before thesis. Evidence before confidence. Survival before position size.**
 
-项目用于研究和流程测试，不构成投资建议。
+</div>
 
-## 工作流结构
+---
 
-```text
-用户数据
-  ↓
-sas-ingest
-  ↓
-sas-bull ──→ sas-bear ──→ sas-crypto（按需）
-  ↓
-sas-judge
-  ↓
-结构化分析报告
+SAS‑FAS is a long-horizon investment-research skill for AI agents. It converts public filings, protocol data, market structure and user-supplied evidence into an auditable research record, independent bull and bear theses, scenario valuation, and—only when requested and adequately informed—a portfolio decision.
+
+Version 5 replaces the former six-skill handoff with one user-facing entry point and progressive disclosure. The orchestrator stays compact; equity, crypto, valuation, market-structure and portfolio rules load only when relevant.
+
+## Design principles
+
+- **Evidence ledger** — every material claim is traceable to a source, date and confidence level.
+- **Adversarial independence** — Bull and Bear receive the same validated evidence, not each other's conclusions.
+- **Asset-aware routing** — banks are not analyzed like manufacturers; tokens are not analyzed like companies.
+- **Deterministic calculation** — defined financial and token metrics run in Python rather than model arithmetic.
+- **Critical-data stop** — missing evidence that could change the verdict produces a blocker report, not invented certainty.
+- **Long-horizon discipline** — 3–5 years is primary; 1–2 years is secondary. Short-term chart prediction is out of scope.
+- **Aggressive ideas, survivable sizing** — asymmetric opportunities are welcome; concentration must reflect permanent-loss risk.
+
+## System architecture
+
+```mermaid
+flowchart LR
+    Q["Research question"] --> R["Asset router"]
+    R --> E["Evidence ledger"]
+    E --> G{"Critical-data gate"}
+    G -->|Blocked| X["BLOCKER.md"]
+    G -->|Ready| C["Deterministic quant"]
+    C --> B1["Bull — isolated"]
+    C --> B2["Bear — isolated"]
+    C --> M["Structural market analysis"]
+    B1 --> J["Judge and valuation"]
+    B2 --> J
+    M --> J
+    J --> P{"Portfolio advice requested?"}
+    P -->|No| F["Final research report"]
+    P -->|Yes; profile complete| D["Action and position range"]
+    D --> F
 ```
 
-`sas-fas-analyst` 负责提示执行顺序。其他 Skill 读取上一步生成的文件，并将本步骤结果写入新的文件。分文件保存用于降低长文本集中在单一上下文时的状态丢失风险，但不能消除模型遗漏或错误。
-
-## 六个 Skill 的输入与输出
-
-| Skill | 主要输入 | 主要输出 | 用途 |
-|:---|:---|:---|:---|
-| `sas-fas-analyst` | 用户任务与工作区状态 | 执行顺序和步骤提示 | 调度整个分析流程 |
-| `sas-ingest` | 财报、业务数据、链接或用户补充材料 | `00_raw_data.json` 等基础文件 | 整理来源、字段和计算输入 |
-| `sas-bull` | 数据整理结果 | `02_bull_thesis.md` | 分析增长、竞争优势和资本配置 |
-| `sas-bear` | 数据整理结果 | `03_bear_thesis.md` | 分析财务、经营和估值风险；缺少关键数据时请求补充 |
-| `sas-crypto` | 代币、合约、流动性与链上资料 | 加密资产分析文件 | 按需分析代币供给、价值捕获和合约风险 |
-| `sas-judge` | 工作区中的上游分析文件 | 汇总报告 | 对照观点、基准率和反事实情景 |
-
-Skill 名称用于保持现有调用方式，角色化标识不代表现实中的专业资质或结果保证。
-
-## 文件传递方式
-
-工作区示例：
+The runtime writes an immutable research dossier instead of repeatedly rewriting one large prompt state:
 
 ```text
-sas_workspace_[Ticker]/
-├── 00_raw_data.json
-├── 01_quant_metrics.json
-├── 02_bull_thesis.md
-├── 03_bear_thesis.md
-├── 04_crypto_thesis.md       # 按需生成
-└── 05_final_report.md
+00_manifest.json
+01_evidence.json
+02_quant.json
+03_bull.md
+04_bear.md
+05_market_structure.md
+06_judge.md
+07_FINAL_REPORT.md
 ```
 
-- 上游数据文件作为后续步骤的输入。
-- 每个分析步骤单独保存 Markdown 或 JSON，避免反复重写单一大型状态文件。
-- 文件编号用于表示处理顺序，不表示内容已经过独立审计。
-- 用户应保留原始资料，以便核对中间文件和最终报告。
+## Coverage
 
-## Python 计算范围
+| Domain | Routes and core questions |
+|---|---|
+| US equities | General operating companies, SaaS, banks, insurers, REITs, cyclicals, pre-revenue biotech and public crypto companies |
+| Crypto | L1/L2, DeFi, DeAI/DePIN, stablecoins, meme assets and hybrid issuer/token structures |
+| Valuation | Reverse DCF, normalized owner earnings, P/TBV and residual economics, probability-adjusted pipeline value, token-specific value capture and scenario ranges |
+| Forensics | Cash conversion, Beneish screening, dilution, governance, insider or treasury flows, emissions, unlocks, admin keys, security and liquidity structure |
+| Portfolio decision | Evidence grade, thesis state, odds state, staged sizing, extreme-undervaluation gates and explicit shorting constraints |
 
-`sas-ingest` 可以使用 Python 脚本计算部分财务或量化指标，例如 Z-Score、M-Score 和用户提供公式中的派生值。脚本计算用于减少手工算术错误，但结果仍依赖输入数据、字段映射和公式假设。
+SAS‑FAS labels reasoning explicitly:
 
-Python 脚本不负责：
+```text
+[F] verified fact
+[I] inference from identified facts
+[H] falsifiable hypothesis
+[U] decision-relevant unknown
+```
 
-- 自动判断财务数据是否真实完整。
-- 替代会计、法律或投资专业意见。
-- 保证文本推理与计算结果一致。
+## Installation
 
-## 使用步骤
+Recommended model: **GPT‑5.6**. Python 3 is required for deterministic calculations. Current public-source research requires network access.
 
-1. 将仓库 `skills` 目录中的 Skill 放入支持 Agent Skill 的工作区。
-2. 输入：`调用 sas-fas-analyst 帮我分析 [Ticker]`。
-3. 根据 `sas-ingest` 的提示提供财报、数据文件或来源链接。
-4. 依次执行 `sas-bull` 和 `sas-bear`；分析加密资产时再执行 `sas-crypto`。
-5. 执行 `sas-judge`，读取工作区文件并生成汇总报告。
-6. 人工核对数据来源、关键计算和引用，再使用分析结果。
+Copy the single skill directory into your Codex skills folder.
 
-具体命令与字段要求以各 Skill 的 `SKILL.md` 为准。
+**Windows PowerShell**
 
-## 当前限制
+```powershell
+Copy-Item -Recurse -Force .\skills\sas-fas-analyst "$env:USERPROFILE\.codex\skills\"
+```
 
-- 工作流依赖所使用模型的指令遵循和上下文处理能力。
-- 分文件可以减少状态集中带来的风险，但不能保证模型不会遗漏、误读或生成无依据内容。
-- 财务框架和阈值用于组织分析，不适用于所有行业、公司或市场阶段。
-- 数据缺失时，部分 Skill 会暂停并请求补充；这不等同于完成了数据完整性审计。
-- Python 计算只覆盖已定义指标，输入字段和单位仍需人工核对。
-- 项目没有独立后端服务、账户系统、数据库或自动交易功能。
+**macOS / Linux**
 
-## 风险提示
+```bash
+cp -R skills/sas-fas-analyst ~/.codex/skills/
+```
 
-- 生成内容仅用于研究、学习和系统测试，不构成投资、财务、法律或税务建议。
-- 模型输出可能包含事实错误、引用错误、计算输入错误或不完整推断。
-- 金融与加密资产存在本金损失、流动性、合规和技术风险。
-- 使用者应核对原始资料，并遵守数据来源、证券法规和 AI 服务平台的使用条款。
+Then invoke it directly or in natural language:
+
+```text
+Use $sas-fas-analyst to analyze TAO as a 3–5 year investment.
+
+用 SAS 深度分析 PLTR：基本盘、估值、永久损失路径，以及当前价格是否值得建立仓位。
+```
+
+One invocation runs the complete workflow. Users no longer call separate ingest, bull, bear, crypto or judge skills.
+
+## Research and decision behavior
+
+SAS‑FAS may conclude that:
+
+- the company is excellent but the odds are unfavorable;
+- the protocol is improving while token capture remains weak;
+- the bear case lacks evidence;
+- the bull case has no defensible moat;
+- available evidence is insufficient to decide.
+
+Personalized buy, sell, short or position-sizing advice is withheld until the investor profile includes current exposure, cost basis, correlated holdings, liquidity needs, loss tolerance, leverage and relevant constraints. Without that profile, the system provides asset-level research only.
+
+Default total-portfolio bands range from a 0.5%–2% observation position to a 10%–15% exceptional-undervaluation allocation. The upper band requires strong evidence, a stable or strengthening fundamental base, conservative margin of safety, survival through the research horizon and explicit ability to withstand a zero.
+
+## Repository structure
+
+```text
+skills/sas-fas-analyst/
+├── SKILL.md
+├── agents/
+│   └── openai.yaml
+├── references/
+│   ├── evidence-policy.md
+│   ├── equities.md
+│   ├── crypto.md
+│   ├── valuation.md
+│   ├── market-structure.md
+│   ├── portfolio-decision.md
+│   ├── input-schema.md
+│   └── report-schema.md
+└── scripts/
+    ├── init_run.py
+    ├── calculate_metrics.py
+    └── validate_run.py
+```
+
+Historical runs are stored outside the skill by default under `CODEX_HOME/sas-fas-data/runs`. Prior dossiers are never overwritten. Raw private portfolio data is not retained unless the user explicitly requests it.
+
+## What SAS‑FAS is not
+
+- Not an autonomous trading system.
+- Not a source of guaranteed returns or price targets.
+- Not a substitute for audited records, legal advice, tax advice or fiduciary judgment.
+- Not immune to incomplete sources, model error, bad mappings or changing market conditions.
+
+Every final report should be checked against its evidence ledger and primary sources before capital is committed.
+
+## License
+
+[MIT](LICENSE)
+
+---
+
+<div align="center">
+
+**Structured Adversarial Synthesis · Financial Analysis System**
+
+</div>
